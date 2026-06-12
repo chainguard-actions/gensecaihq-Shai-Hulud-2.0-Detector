@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v1.0.0 | [`v1.0.0`](https://github.com/chainguard-actions/gensecaihq-Shai-Hulud-2.0-Detector/tree/v1.0.0) | — |
+| v1.0.2 | [`v1.0.2`](https://github.com/chainguard-actions/gensecaihq-Shai-Hulud-2.0-Detector/tree/v1.0.2) | [`55cd78e`](https://github.com/gensecaihq/Shai-Hulud-2.0-Detector/commit/55cd78e683ee88b1f0a7e084919908e402462ec3) |
 
 ## Privacy
 
