@@ -1,0 +1,83 @@
+name: Test JSON output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Node.js 24 via nvm
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          if [ -s "$NVM_DIR/nvm.sh" ]; then
+            . "$NVM_DIR/nvm.sh"
+            nvm install 24 --no-progress
+            nvm use 24
+            NODE_BIN="$(nvm which 24)"
+            NODE_DIR="$(dirname "$NODE_BIN")"
+            echo "$NODE_DIR" >> "$GITHUB_PATH"
+            echo "Node.js 24 installed: $($NODE_BIN --version)"
+          else
+            echo "nvm not found, using system node: $(node --version 2>/dev/null || echo 'not found')"
+          fi
+      - name: Create a clean project directory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/json-project"
+          cat > "$GITHUB_WORKSPACE/json-project/package.json" << 'EOF'
+          {
+            "name": "json-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "express": "^4.18.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'json'
+          working-directory: 'json-project'
+      - name: Assert results output is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+          FINDINGS: ${{ steps.action.outputs.security-findings }}
+        run: |
+          echo "results: $RESULTS"
+          echo "security-findings: $FINDINGS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          if ! echo "$RESULTS" | python3 -c "import sys,json; data=json.load(sys.stdin); assert isinstance(data, list)" 2>/dev/null; then
+            echo "FAIL: results is not a valid JSON array: $RESULTS"
+            exit 1
+          fi
+          echo "PASS: results is a valid JSON array"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: security-findings output is empty"
+            exit 1
+          fi
+          if ! echo "$FINDINGS" | python3 -c "import sys,json; data=json.load(sys.stdin); assert isinstance(data, list)" 2>/dev/null; then
+            echo "FAIL: security-findings is not a valid JSON array: $FINDINGS"
+            exit 1
+          fi
+          echo "PASS: security-findings is a valid JSON array"
+      - name: Assert scan-time is set and numeric
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: scan-time is not a non-negative integer (ms): $SCAN_TIME"
+            exit 1
+          fi
+          echo "PASS: scan-time=$SCAN_TIME ms"

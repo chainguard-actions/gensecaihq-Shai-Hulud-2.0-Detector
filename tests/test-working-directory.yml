@@ -1,0 +1,59 @@
+name: Test custom working-directory scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Node.js 24 via nvm
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          if [ -s "$NVM_DIR/nvm.sh" ]; then
+            . "$NVM_DIR/nvm.sh"
+            nvm install 24 --no-progress
+            nvm use 24
+            NODE_BIN="$(nvm which 24)"
+            NODE_DIR="$(dirname "$NODE_BIN")"
+            echo "$NODE_DIR" >> "$GITHUB_PATH"
+            echo "Node.js 24 installed: $($NODE_BIN --version)"
+          else
+            echo "nvm not found, using system node: $(node --version 2>/dev/null || echo 'not found')"
+          fi
+      - name: Create a subdirectory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/scan-target"
+          echo "Created scan target directory at $GITHUB_WORKSPACE/scan-target"
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: 'scan-target'
+      - name: Assert scan completed on custom directory
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $AFFECTED"
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          # An empty directory should be clean
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected 'clean' for empty directory, got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: custom working-directory scan returned status=$STATUS"

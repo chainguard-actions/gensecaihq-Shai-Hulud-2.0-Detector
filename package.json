@@ -1,0 +1,49 @@
+{
+	"name": "shai-hulud-detector",
+	"version": "2.2.0",
+	"description": "GitHub Action to detect Shai-Hulud supply chain attacks (2.0 and ChainDrop waves) with SHA256 hash matching, IDE/agent persistence detection, and runner installation scanning",
+	"main": "dist/index.js",
+	"scripts": {
+		"build": "ncc build src/index.ts -o dist --source-map --license licenses.txt",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit",
+		"scan": "node dist/index.js"
+	},
+	"keywords": [
+		"github-action",
+		"security",
+		"npm",
+		"supply-chain",
+		"shai-hulud",
+		"chaindrop",
+		"vulnerability",
+		"scanner"
+	],
+	"author": "gensecaihq (https://github.com/gensecaihq)",
+	"license": "MIT",
+	"dependencies": {
+		"@actions/core": "^1.11.1",
+		"js-yaml": "^4.1.1",
+		"json5": "^2.2.3",
+		"semver": "^7.7.3",
+		"yargs": "^17.7.2"
+	},
+	"devDependencies": {
+		"@types/js-yaml": "^4.0.9",
+		"@types/node": "^24.0.0",
+		"@types/semver": "^7.7.1",
+		"@types/yargs": "^17.0.35",
+		"@vercel/ncc": "^0.38.4",
+		"typescript": "^5.9.3",
+		"vite": "^8.0.13",
+		"vitest": "4.1.6"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/gensecaihq/Shai-Hulud-2.0-Detector.git"
+	},
+	"bugs": {
+		"url": "https://github.com/gensecaihq/Shai-Hulud-2.0-Detector/issues"
+	},
+	"homepage": "https://github.com/gensecaihq/Shai-Hulud-2.0-Detector#readme"
+}

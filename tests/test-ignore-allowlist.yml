@@ -1,0 +1,73 @@
+name: Test ignore-allowlist option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Node.js 24 via nvm
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          if [ -s "$NVM_DIR/nvm.sh" ]; then
+            . "$NVM_DIR/nvm.sh"
+            nvm install 24 --no-progress
+            nvm use 24
+            NODE_BIN="$(nvm which 24)"
+            NODE_DIR="$(dirname "$NODE_BIN")"
+            echo "$NODE_DIR" >> "$GITHUB_PATH"
+            echo "Node.js 24 installed: $($NODE_BIN --version)"
+          else
+            echo "nvm not found, using system node: $(node --version 2>/dev/null || echo 'not found')"
+          fi
+      - name: Create a clean project directory to scan
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/ignore-allowlist-project"
+          cat > "$GITHUB_WORKSPACE/ignore-allowlist-project/package.json" << 'EOF'
+          {
+            "name": "ignore-allowlist-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "express": "^4.18.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'json'
+          working-directory: 'ignore-allowlist-project'
+          ignore-allowlist: 'true'
+      - name: Assert all outputs are set when ignore-allowlist is true
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $AFFECTED"
+          echo "security-findings-count: $FINDINGS"
+          echo "results length: ${#RESULTS}"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          if ! echo "$AFFECTED" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count is not a non-negative integer: $AFFECTED"
+            exit 1
+          fi
+          if ! echo "$FINDINGS" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: security-findings-count is not a non-negative integer: $FINDINGS"
+            exit 1
+          fi
+          echo "PASS: ignore-allowlist=true scan completed successfully"
