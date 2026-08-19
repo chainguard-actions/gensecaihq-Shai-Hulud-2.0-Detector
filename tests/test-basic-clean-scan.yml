@@ -1,0 +1,85 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory with no npm files
+        run: |
+          mkdir -p /tmp/basic-clean-scan
+          # No package.json, no lockfiles — scanner should find nothing
+          echo "Created clean scan target at /tmp/basic-clean-scan"
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'true'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/basic-clean-scan'
+
+      - name: Assert status is clean
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' but got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status is clean"
+
+      - name: Assert affected-count is zero
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected affected-count '0' but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: affected-count is 0"
+
+      - name: Assert security-findings-count is zero
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS"
+          if [ "$FINDINGS" != "0" ]; then
+            echo "FAIL: expected security-findings-count '0' but got '$FINDINGS'"
+            exit 1
+          fi
+          echo "PASS: security-findings-count is 0"
+
+      - name: Assert scan-time is set
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: expected scan-time to be set"
+            exit 1
+          fi
+          echo "PASS: scan-time is set to $SCAN_TIME ms"
+
+      - name: Assert results is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: expected results to be set"
+            exit 1
+          fi
+          # Should be a JSON array (empty [] for clean scan)
+          echo "$RESULTS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list), 'Expected a list'" || {
+            echo "FAIL: results is not a valid JSON array"
+            exit 1
+          }
+          echo "PASS: results is a valid JSON array"

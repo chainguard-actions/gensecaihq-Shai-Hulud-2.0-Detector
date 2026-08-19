@@ -1,0 +1,77 @@
+name: Test JSON output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory for JSON output test
+        run: |
+          mkdir -p /tmp/json-output-scan
+          printf '{\n  "name": "json-test-project",\n  "version": "1.0.0",\n  "dependencies": {}\n}\n' > /tmp/json-output-scan/package.json
+          echo "Created clean scan target"
+
+      - id: action
+        uses: .
+        with:
+          output-format: 'json'
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          working-directory: '/tmp/json-output-scan'
+
+      - name: Assert results output is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: expected results output to be set"
+            exit 1
+          fi
+          echo "$RESULTS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list)" || {
+            echo "FAIL: results is not a valid JSON array"
+            exit 1
+          }
+          echo "PASS: results is a valid JSON array"
+
+      - name: Assert security-findings output is valid JSON array
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings }}
+        run: |
+          echo "security-findings: $FINDINGS"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: expected security-findings output to be set"
+            exit 1
+          fi
+          echo "$FINDINGS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list)" || {
+            echo "FAIL: security-findings is not a valid JSON array"
+            exit 1
+          }
+          echo "PASS: security-findings is a valid JSON array"
+
+      - name: Assert affected-count is numeric
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected affected-count to be a non-negative integer, got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: affected-count is numeric: $COUNT"
+
+      - name: Assert security-findings-count is numeric
+        env:
+          FINDINGS_COUNT: ${{ steps.action.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS_COUNT"
+          if ! echo "$FINDINGS_COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected security-findings-count to be a non-negative integer, got '$FINDINGS_COUNT'"
+            exit 1
+          fi
+          echo "PASS: security-findings-count is numeric: $FINDINGS_COUNT"

@@ -1,0 +1,64 @@
+name: Test JSON output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a clean package.json
+        run: |
+          mkdir -p /tmp/json-test-project
+          cat > /tmp/json-test-project/package.json << 'EOF'
+          {
+            "name": "json-test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "axios": "^1.6.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'json'
+          working-directory: '/tmp/json-test-project'
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status=$STATUS"
+      - name: Assert affected-count is a number
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count is not a non-negative integer: '$COUNT'"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert security-findings is valid JSON
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings }}
+        run: |
+          echo "security-findings: $FINDINGS"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: security-findings output is empty"
+            exit 1
+          fi
+          echo "$FINDINGS" | python3 -c "import sys, json; data=json.load(sys.stdin); assert isinstance(data, list), 'not a list'" || {
+            echo "FAIL: security-findings is not a valid JSON array"
+            exit 1
+          }
+          echo "PASS"

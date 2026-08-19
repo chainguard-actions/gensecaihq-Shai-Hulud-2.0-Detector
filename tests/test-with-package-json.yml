@@ -1,0 +1,65 @@
+name: Test scan with package.json
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a clean package.json in a temp directory
+        run: |
+          mkdir -p /tmp/test-project
+          cat > /tmp/test-project/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21",
+              "express": "^4.18.2"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/test-project'
+      - name: Assert status is clean
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert affected-count is zero
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected affected-count '0', got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert results is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          echo "$RESULTS" | python3 -c "import sys, json; data=json.load(sys.stdin); assert isinstance(data, list), 'not a list'" || {
+            echo "FAIL: results is not a valid JSON array"
+            exit 1
+          }
+          echo "PASS"

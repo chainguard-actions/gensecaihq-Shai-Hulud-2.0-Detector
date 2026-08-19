@@ -1,0 +1,64 @@
+name: Test custom working directory
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean subdirectory to scan
+        run: |
+          mkdir -p /tmp/scan-target
+          # Create a minimal package.json with no dependencies to ensure clean scan
+          printf '{\n  "name": "test-project",\n  "version": "1.0.0",\n  "description": "A clean test project",\n  "dependencies": {}\n}\n' > /tmp/scan-target/package.json
+          echo "Created clean scan target at /tmp/scan-target"
+          cat /tmp/scan-target/package.json
+
+      - id: action
+        uses: .
+        with:
+          output-format: 'text'
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          working-directory: '/tmp/scan-target'
+
+      - name: Assert status is clean for the subdirectory
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' for clean subdirectory, got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status is clean for custom working directory"
+
+      - name: Assert affected-count is zero
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected affected-count '0' for clean directory, got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: affected-count is 0 for custom working directory"
+
+      - name: Assert scan-time is set and numeric
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: expected scan-time to be set"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected scan-time to be numeric, got '$SCAN_TIME'"
+            exit 1
+          fi
+          echo "PASS: scan-time is $SCAN_TIME ms"

@@ -1,0 +1,59 @@
+name: Test fail-on-any with clean scan does not fail
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory to scan
+        run: |
+          mkdir -p /tmp/clean-project
+          printf '{\n  "name": "clean-project",\n  "version": "1.0.0",\n  "dependencies": {}\n}\n' > /tmp/clean-project/package.json
+          echo "Created clean project:"
+          cat /tmp/clean-project/package.json
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'true'
+          fail-on-high: 'true'
+          fail-on-any: 'true'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'json'
+          working-directory: '/tmp/clean-project'
+
+      - name: Assert action succeeded with clean status
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' but got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: action succeeded with clean status even with fail-on-any=true"
+
+      - name: Assert affected-count is zero
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected affected-count '0' but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: no affected packages found"
+
+      - name: Assert security-findings-count is zero
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS"
+          if [ "$FINDINGS" != "0" ]; then
+            echo "FAIL: expected security-findings-count '0' but got '$FINDINGS'"
+            exit 1
+          fi
+          echo "PASS: no security findings"

@@ -1,0 +1,69 @@
+name: Test SARIF output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory for SARIF output test
+        run: |
+          mkdir -p /tmp/sarif-output-scan
+          printf '{\n  "name": "sarif-test-project",\n  "version": "1.0.0",\n  "dependencies": {}\n}\n' > /tmp/sarif-output-scan/package.json
+          echo "Created clean scan target"
+
+      - id: action
+        uses: .
+        with:
+          output-format: 'sarif'
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          working-directory: '/tmp/sarif-output-scan'
+
+      - name: Assert sarif-file output is set
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "sarif-file: $SARIF_FILE"
+          if [ -z "$SARIF_FILE" ]; then
+            echo "FAIL: expected sarif-file output to be set"
+            exit 1
+          fi
+          echo "PASS: sarif-file output is set to '$SARIF_FILE'"
+
+      - name: Assert SARIF file exists on disk
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "Checking for SARIF file at: $SARIF_FILE"
+          if [ ! -f "$SARIF_FILE" ]; then
+            echo "FAIL: SARIF file does not exist at '$SARIF_FILE'"
+            exit 1
+          fi
+          echo "PASS: SARIF file exists"
+
+      - name: Assert SARIF file is valid JSON with expected schema
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "Validating SARIF file content..."
+          cat "$SARIF_FILE" | python3 -c "import json,sys; d=json.load(sys.stdin); assert 'runs' in d and isinstance(d['runs'],list), 'Invalid SARIF: missing runs'; print('PASS: SARIF valid with',len(d['runs']),'run(s)')"
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: expected status output to be set"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: expected status to be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"

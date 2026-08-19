@@ -1,0 +1,48 @@
+name: Test fail-on-any false does not fail on clean project
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a clean project directory
+        run: |
+          mkdir -p /tmp/clean-project
+          cat > /tmp/clean-project/package.json << 'EOF'
+          {
+            "name": "clean-project",
+            "version": "1.0.0",
+            "description": "A clean project with no compromised packages",
+            "dependencies": {
+              "chalk": "^5.3.0",
+              "commander": "^11.0.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'true'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/clean-project'
+      - name: Assert action completed and status is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $COUNT"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          echo "PASS: action completed successfully with status=$STATUS, affected-count=$COUNT"

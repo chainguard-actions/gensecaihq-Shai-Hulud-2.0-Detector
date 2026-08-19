@@ -1,0 +1,105 @@
+name: Test default inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory for default-inputs test
+        run: |
+          mkdir -p /tmp/default-inputs-scan
+          # Empty directory — no npm files — scanner should find nothing
+          echo "Created clean scan target"
+
+      # Run with explicit working-directory pointing to clean dir.
+      # All other inputs use defaults:
+      # fail-on-critical: true, fail-on-high: false, fail-on-any: false
+      # scan-lockfiles: true, scan-node-modules: false, output-format: text
+      - id: action
+        uses: .
+        with:
+          working-directory: '/tmp/default-inputs-scan'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: expected status output to be set"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: expected status to be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count output is set and numeric
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected affected-count to be a non-negative integer, got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: affected-count is $COUNT"
+
+      - name: Assert security-findings-count output is set and numeric
+        env:
+          FINDINGS_COUNT: ${{ steps.action.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS_COUNT"
+          if ! echo "$FINDINGS_COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected security-findings-count to be a non-negative integer, got '$FINDINGS_COUNT'"
+            exit 1
+          fi
+          echo "PASS: security-findings-count is $FINDINGS_COUNT"
+
+      - name: Assert scan-time output is set and numeric
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: expected scan-time to be set"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected scan-time to be numeric, got '$SCAN_TIME'"
+            exit 1
+          fi
+          echo "PASS: scan-time is $SCAN_TIME ms"
+
+      - name: Assert results output is valid JSON
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: expected results to be set"
+            exit 1
+          fi
+          echo "$RESULTS" | python3 -c "import sys, json; json.load(sys.stdin)" || {
+            echo "FAIL: results is not valid JSON"
+            exit 1
+          }
+          echo "PASS: results is valid JSON"
+
+      - name: Assert security-findings output is valid JSON
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings }}
+        run: |
+          echo "security-findings: $FINDINGS"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: expected security-findings to be set"
+            exit 1
+          fi
+          echo "$FINDINGS" | python3 -c "import sys, json; json.load(sys.stdin)" || {
+            echo "FAIL: security-findings is not valid JSON"
+            exit 1
+          }
+          echo "PASS: security-findings is valid JSON"

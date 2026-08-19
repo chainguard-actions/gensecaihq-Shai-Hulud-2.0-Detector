@@ -1,0 +1,69 @@
+name: Test scan-node-modules option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a project with node_modules to scan
+        run: |
+          mkdir -p /tmp/node-modules-project/node_modules/safe-package
+          printf '{\n  "name": "node-modules-test",\n  "version": "1.0.0",\n  "dependencies": {\n    "safe-package": "1.0.0"\n  }\n}\n' > /tmp/node-modules-project/package.json
+          printf '{\n  "name": "safe-package",\n  "version": "1.0.0",\n  "description": "A safe package for testing"\n}\n' > /tmp/node-modules-project/node_modules/safe-package/package.json
+          echo "Created node_modules test project"
+          cat /tmp/node-modules-project/package.json
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'true'
+          output-format: 'json'
+          working-directory: '/tmp/node-modules-project'
+
+      - name: Assert action completed and status is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: expected status output to be set"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: expected status to be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count is numeric
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected affected-count to be numeric, got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: affected-count is $COUNT"
+
+      - name: Assert results is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: expected results output to be set"
+            exit 1
+          fi
+          echo "$RESULTS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list)" || {
+            echo "FAIL: results is not a valid JSON array"
+            exit 1
+          }
+          ENTRY_COUNT=$(echo "$RESULTS" | python3 -c "import sys, json; print(len(json.load(sys.stdin)))")
+          echo "PASS: results is a valid JSON array with $ENTRY_COUNT entries"
