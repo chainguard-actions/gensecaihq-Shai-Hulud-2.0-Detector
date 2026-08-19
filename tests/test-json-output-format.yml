@@ -1,0 +1,102 @@
+name: Test JSON output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory with a minimal package.json
+        run: |
+          mkdir -p /tmp/json-format-target
+          cat > /tmp/json-format-target/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21"
+            }
+          }
+          EOF
+          echo "Created test directory"
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          output-format: 'json'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          working-directory: '/tmp/json-format-target'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert results is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results length: ${#RESULTS}"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          COUNT=$(echo "$RESULTS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list), 'Expected JSON array'; print(len(data))")
+          echo "PASS: results is a valid JSON array with $COUNT items"
+
+      - name: Assert security-findings is valid JSON array
+        env:
+          FINDINGS_JSON: ${{ steps.action.outputs.security-findings }}
+        run: |
+          echo "security-findings length: ${#FINDINGS_JSON}"
+          if [ -z "$FINDINGS_JSON" ]; then
+            echo "FAIL: security-findings output is empty"
+            exit 1
+          fi
+          COUNT=$(echo "$FINDINGS_JSON" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list), 'Expected JSON array'; print(len(data))")
+          echo "PASS: security-findings is a valid JSON array with $COUNT items"
+
+      - name: Assert affected-count is numeric
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count is not a non-negative integer: $COUNT"
+            exit 1
+          fi
+          echo "PASS: affected-count is numeric: $COUNT"
+
+      - name: Assert scan-time is numeric
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: scan-time is not a non-negative integer (ms): $SCAN_TIME"
+            exit 1
+          fi
+          echo "PASS: scan-time is numeric: $SCAN_TIME ms"

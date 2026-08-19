@@ -1,0 +1,90 @@
+name: Test SARIF output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean directory with a minimal package.json
+        run: |
+          mkdir -p /tmp/sarif-format-target
+          cat > /tmp/sarif-format-target/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21"
+            }
+          }
+          EOF
+          echo "Created test directory"
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          output-format: 'sarif'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          working-directory: '/tmp/sarif-format-target'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert sarif-file output is set
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "sarif-file: $SARIF_FILE"
+          if [ -z "$SARIF_FILE" ]; then
+            echo "FAIL: sarif-file output is empty when output-format is sarif"
+            exit 1
+          fi
+          echo "PASS: sarif-file is set to '$SARIF_FILE'"
+
+      - name: Assert SARIF file exists and is valid JSON
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "Checking SARIF file: $SARIF_FILE"
+          if [ ! -f "$SARIF_FILE" ]; then
+            echo "FAIL: SARIF file does not exist at path: $SARIF_FILE"
+            exit 1
+          fi
+          python3 -c "import json; data = json.load(open('$SARIF_FILE')); print('Valid JSON, keys:', list(data.keys()))"
+          echo "PASS: SARIF file exists and is valid JSON"
+
+      - name: Assert SARIF file has required fields
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "Checking SARIF required fields in: $SARIF_FILE"
+          HAS_VERSION=$(python3 -c "import json; d=json.load(open('$SARIF_FILE')); print('yes' if 'version' in d else 'no')")
+          HAS_RUNS=$(python3 -c "import json; d=json.load(open('$SARIF_FILE')); print('yes' if 'runs' in d else 'no')")
+          echo "has_version: $HAS_VERSION"
+          echo "has_runs: $HAS_RUNS"
+          if [ "$HAS_VERSION" != "yes" ]; then
+            echo "FAIL: SARIF file missing version field"
+            exit 1
+          fi
+          if [ "$HAS_RUNS" != "yes" ]; then
+            echo "FAIL: SARIF file missing runs field"
+            exit 1
+          fi
+          echo "PASS: SARIF file has version and runs fields"

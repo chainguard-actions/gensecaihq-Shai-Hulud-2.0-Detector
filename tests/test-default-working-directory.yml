@@ -1,0 +1,76 @@
+name: Test default working directory scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: scan
+        uses: .
+        with:
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.scan.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: expected status to be set"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: expected status to be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert affected-count output is set
+        env:
+          AFFECTED: ${{ steps.scan.outputs.affected-count }}
+        run: |
+          echo "affected-count: $AFFECTED"
+          if [ -z "$AFFECTED" ]; then
+            echo "FAIL: expected affected-count to be set"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert security-findings-count output is set
+        env:
+          FINDINGS_COUNT: ${{ steps.scan.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS_COUNT"
+          if [ -z "$FINDINGS_COUNT" ]; then
+            echo "FAIL: expected security-findings-count to be set"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert results output is a JSON array
+        env:
+          RESULTS: ${{ steps.scan.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if ! echo "$RESULTS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list)" 2>/dev/null; then
+            echo "FAIL: results output is not a valid JSON array"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert security-findings output is a JSON array
+        env:
+          FINDINGS: ${{ steps.scan.outputs.security-findings }}
+        run: |
+          echo "security-findings: $FINDINGS"
+          if ! echo "$FINDINGS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list)" 2>/dev/null; then
+            echo "FAIL: security-findings output is not a valid JSON array"
+            exit 1
+          fi
+          echo "PASS"

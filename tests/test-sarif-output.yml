@@ -1,0 +1,70 @@
+name: Test SARIF output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a clean project directory
+        run: |
+          mkdir -p /tmp/sarif-test-project
+          cat > /tmp/sarif-test-project/package.json << 'EOF'
+          {
+            "name": "sarif-test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "axios": "^1.6.0"
+            }
+          }
+          EOF
+
+      - id: scan
+        uses: .
+        with:
+          working-directory: /tmp/sarif-test-project
+          output-format: 'sarif'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+
+      - name: Assert sarif-file output is set
+        env:
+          SARIF_FILE: ${{ steps.scan.outputs.sarif-file }}
+        run: |
+          echo "sarif-file: $SARIF_FILE"
+          if [ -z "$SARIF_FILE" ]; then
+            echo "FAIL: expected sarif-file output to be set"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert SARIF file exists and is valid JSON
+        env:
+          SARIF_FILE: ${{ steps.scan.outputs.sarif-file }}
+        run: |
+          echo "Checking SARIF file: $SARIF_FILE"
+          if [ ! -f "$SARIF_FILE" ]; then
+            echo "FAIL: SARIF file does not exist at path: $SARIF_FILE"
+            exit 1
+          fi
+          if ! python3 -c "import sys, json; data = json.load(open('$SARIF_FILE')); assert '\$schema' in data or 'version' in data" 2>/dev/null; then
+            echo "FAIL: SARIF file is not valid JSON or missing required fields"
+            cat "$SARIF_FILE" | head -50
+            exit 1
+          fi
+          echo "PASS: SARIF file exists and is valid"
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.scan.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: expected status to be set"
+            exit 1
+          fi
+          echo "PASS"

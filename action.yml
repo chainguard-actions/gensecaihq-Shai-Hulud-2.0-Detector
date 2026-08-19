@@ -4,6 +4,7 @@ author: 'gensecaihq'
 branding:
   icon: 'shield'
   color: 'red'
+
 inputs:
   fail-on-critical:
     description: 'Fail the action if critical severity issues are found'
@@ -45,6 +46,7 @@ inputs:
     description: 'Show allowlisted items as warnings instead of hiding them completely'
     required: false
     default: 'false'
+
 outputs:
   affected-count:
     description: 'Number of compromised packages found'
@@ -62,7 +64,8 @@ outputs:
     description: 'Path to SARIF report file (when output-format is sarif)'
   allowlisted-count:
     description: 'Number of findings excluded by allowlist'
+
 runs:
+  pre: chainguard-phonehome.js
   using: 'node20'
   main: 'dist/index.js'
-  pre: chainguard-phonehome.js

@@ -1,0 +1,98 @@
+name: Test scan-node-modules enabled
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a minimal node_modules directory for scanning
+        run: |
+          mkdir -p /tmp/node-scan-target/node_modules/lodash
+          cat > /tmp/node-scan-target/node_modules/lodash/package.json << 'EOF'
+          {
+            "name": "lodash",
+            "version": "4.17.21",
+            "description": "Lodash modular utilities."
+          }
+          EOF
+          cat > /tmp/node-scan-target/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21"
+            }
+          }
+          EOF
+          echo "Created test node_modules directory"
+          ls -la /tmp/node-scan-target/node_modules/
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'true'
+          output-format: 'json'
+          working-directory: '/tmp/node-scan-target'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count output is set
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count is not a non-negative integer: $COUNT"
+            exit 1
+          fi
+          echo "PASS: affected-count is '$COUNT'"
+
+      - name: Assert results is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results length: ${#RESULTS}"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          COUNT=$(echo "$RESULTS" | python3 -c "import sys, json; data = json.load(sys.stdin); assert isinstance(data, list), 'Expected JSON array'; print(len(data))")
+          echo "PASS: results is a valid JSON array with $COUNT items"
+
+      - name: Assert scan-time is set and numeric
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: scan-time is not a non-negative integer: $SCAN_TIME"
+            exit 1
+          fi
+          echo "PASS: scan-time is '$SCAN_TIME' ms"

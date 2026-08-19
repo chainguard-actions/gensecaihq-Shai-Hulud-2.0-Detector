@@ -1,0 +1,95 @@
+name: Test scan lockfiles
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create project with lockfile
+        run: |
+          mkdir -p /tmp/lockfile-test-project
+          cat > /tmp/lockfile-test-project/package.json << 'EOF'
+          {
+            "name": "lockfile-test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "semver": "^7.5.4"
+            }
+          }
+          EOF
+          # Create a minimal package-lock.json (v3 format)
+          cat > /tmp/lockfile-test-project/package-lock.json << 'EOF'
+          {
+            "name": "lockfile-test-project",
+            "version": "1.0.0",
+            "lockfileVersion": 3,
+            "requires": true,
+            "packages": {
+              "": {
+                "name": "lockfile-test-project",
+                "version": "1.0.0",
+                "dependencies": {
+                  "semver": "^7.5.4"
+                }
+              },
+              "node_modules/semver": {
+                "version": "7.5.4",
+                "resolved": "https://registry.npmjs.org/semver/-/semver-7.5.4.tgz",
+                "integrity": "sha512-1bCSESV6Pv+i21Hvpxp3Dx+pSD8lIPeLqxtl4m+8+uKKmntWuwVGauhuh4eiebihsbk69mu3d0jy7nkpCQTog=="
+              }
+            }
+          }
+          EOF
+
+      - id: scan
+        uses: .
+        with:
+          working-directory: /tmp/lockfile-test-project
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+
+      - name: Assert status is set
+        env:
+          STATUS: ${{ steps.scan.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: expected status to be set"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: expected status to be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert affected-count is set
+        env:
+          AFFECTED: ${{ steps.scan.outputs.affected-count }}
+        run: |
+          echo "affected-count: $AFFECTED"
+          if [ -z "$AFFECTED" ]; then
+            echo "FAIL: expected affected-count to be set"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert scan-time is set and numeric
+        env:
+          SCAN_TIME: ${{ steps.scan.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: expected scan-time to be set"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+(\.[0-9]+)?$'; then
+            echo "FAIL: expected scan-time to be numeric, got '$SCAN_TIME'"
+            exit 1
+          fi
+          echo "PASS"

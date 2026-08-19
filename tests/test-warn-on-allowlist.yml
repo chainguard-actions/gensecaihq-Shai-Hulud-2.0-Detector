@@ -1,0 +1,101 @@
+name: Test warn-on-allowlist flag
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create clean directory with allowlist file
+        run: |
+          mkdir -p /tmp/warn-allowlist-target
+          cat > /tmp/warn-allowlist-target/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21"
+            }
+          }
+          EOF
+          # Create an empty allowlist file in the working directory
+          echo '[]' > /tmp/warn-allowlist-target/.shai-hulud-allowlist.json
+          echo "Created test directory with allowlist"
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/warn-allowlist-target'
+          ignore-allowlist: 'false'
+          warn-on-allowlist: 'true'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert all outputs are present
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+          ALLOWLISTED: ${{ steps.action.outputs.allowlisted-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          echo "security-findings-count: $FINDINGS"
+          echo "scan-time: $SCAN_TIME"
+          echo "allowlisted-count: $ALLOWLISTED"
+          FAIL=0
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            FAIL=1
+          fi
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: security-findings-count output is empty"
+            FAIL=1
+          fi
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            FAIL=1
+          fi
+          if [ -z "$ALLOWLISTED" ]; then
+            echo "FAIL: allowlisted-count output is empty"
+            FAIL=1
+          fi
+          if [ "$FAIL" = "1" ]; then
+            exit 1
+          fi
+          echo "PASS: all outputs are present"
+
+      - name: Assert numeric outputs are valid integers
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+          ALLOWLISTED: ${{ steps.action.outputs.allowlisted-count }}
+        run: |
+          for VAR_NAME in COUNT FINDINGS SCAN_TIME ALLOWLISTED; do
+            eval "VAL=\$$VAR_NAME"
+            if ! echo "$VAL" | grep -qE '^[0-9]+$'; then
+              echo "FAIL: $VAR_NAME is not a non-negative integer: $VAL"
+              exit 1
+            fi
+          done
+          echo "PASS: all numeric outputs are valid integers"
