@@ -1,0 +1,74 @@
+name: Test JSON output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a safe package.json for scanning
+        run: |
+          mkdir -p /tmp/safe-project
+          cat > /tmp/safe-project/package.json <<'EOF'
+          {
+            "name": "safe-test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "4.17.21",
+              "axios": "1.6.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'json'
+          working-directory: '/tmp/safe-project'
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: status=$STATUS"
+      - name: Assert results output is valid JSON array
+        env:
+          RESULTS: ${{ steps.action.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          # Validate it's a JSON array
+          if ! echo "$RESULTS" | python3 -c "import sys,json; data=json.load(sys.stdin); assert isinstance(data, list)" 2>/dev/null; then
+            echo "FAIL: results is not a valid JSON array"
+            exit 1
+          fi
+          echo "PASS: results is a valid JSON array"
+      - name: Assert security-findings output is valid JSON array
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings }}
+        run: |
+          echo "security-findings: $FINDINGS"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: security-findings output is empty"
+            exit 1
+          fi
+          if ! echo "$FINDINGS" | python3 -c "import sys,json; data=json.load(sys.stdin); assert isinstance(data, list)" 2>/dev/null; then
+            echo "FAIL: security-findings is not a valid JSON array"
+            exit 1
+          fi
+          echo "PASS: security-findings is a valid JSON array"

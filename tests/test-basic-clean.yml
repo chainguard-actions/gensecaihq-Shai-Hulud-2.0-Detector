@@ -1,0 +1,58 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '.'
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $AFFECTED"
+          echo "security-findings-count: $FINDINGS"
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+      - name: Assert affected-count is a number
+        env:
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $AFFECTED"
+          if ! echo "$AFFECTED" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count is not a non-negative integer: $AFFECTED"
+            exit 1
+          fi
+          echo "PASS: affected-count=$AFFECTED"
+      - name: Assert scan-time is set
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          echo "PASS: scan-time=$SCAN_TIME"

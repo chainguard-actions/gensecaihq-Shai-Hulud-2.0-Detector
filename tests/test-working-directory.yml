@@ -1,0 +1,59 @@
+name: Test working-directory input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a subdirectory project to scan
+        run: |
+          mkdir -p tests/fixtures/subproject
+          cat > tests/fixtures/subproject/package.json <<'EOF'
+          {
+            "name": "subproject",
+            "version": "1.0.0",
+            "dependencies": {
+              "chalk": "5.3.0",
+              "dotenv": "16.3.1"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: 'tests/fixtures/subproject'
+      - name: Assert action completed with valid outputs
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $AFFECTED"
+          echo "security-findings-count: $FINDINGS"
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got: $STATUS"
+            exit 1
+          fi
+          if ! echo "$AFFECTED" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count is not a non-negative integer: $AFFECTED"
+            exit 1
+          fi
+          if ! echo "$FINDINGS" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: security-findings-count is not a non-negative integer: $FINDINGS"
+            exit 1
+          fi
+          echo "PASS: working-directory scan completed with status=$STATUS"

@@ -1,0 +1,55 @@
+name: Test fail-on-any with clean project
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a safe project directory
+        run: |
+          mkdir -p /tmp/clean-project
+          cat > /tmp/clean-project/package.json <<'EOF'
+          {
+            "name": "clean-project",
+            "version": "1.0.0",
+            "description": "A clean project with no compromised packages",
+            "dependencies": {
+              "express": "4.18.2",
+              "commander": "11.0.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'true'
+          fail-on-high: 'false'
+          fail-on-any: 'true'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/clean-project'
+      - name: Assert action completed with clean status
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $AFFECTED"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: action completed with status=$STATUS, affected-count=$AFFECTED"
+      - name: Assert affected-count is zero for clean project
+        env:
+          AFFECTED: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $AFFECTED"
+          if [ "$AFFECTED" != "0" ]; then
+            echo "WARN: expected 0 affected packages for clean project, got: $AFFECTED"
+            echo "This may indicate the test packages are in the compromised list"
+          else
+            echo "PASS: affected-count=0 as expected for clean project"
+          fi

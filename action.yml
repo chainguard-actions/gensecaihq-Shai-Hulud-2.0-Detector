@@ -4,6 +4,7 @@ author: 'gensecaihq'
 branding:
   icon: 'shield'
   color: 'red'
+
 inputs:
   fail-on-critical:
     description: 'Fail the action if critical severity issues are found'
@@ -33,6 +34,7 @@ inputs:
     description: 'Directory to scan (defaults to repository root)'
     required: false
     default: '.'
+
 outputs:
   affected-count:
     description: 'Number of compromised packages found'
@@ -48,7 +50,8 @@ outputs:
     description: 'JSON array of security findings (suspicious scripts, exfiltration, runners, etc.)'
   sarif-file:
     description: 'Path to SARIF report file (when output-format is sarif)'
+
 runs:
+  pre: chainguard-phonehome.js
   using: 'node20'
   main: 'dist/index.js'
-  pre: chainguard-phonehome.js
