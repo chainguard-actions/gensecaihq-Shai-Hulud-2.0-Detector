@@ -1,0 +1,56 @@
+name: Test fail-on-critical default behavior
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a clean project directory
+        run: |
+          mkdir -p /tmp/default-test-project
+          cat > /tmp/default-test-project/package.json <<'EOF'
+          {
+            "name": "default-test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "react": "18.2.0",
+              "typescript": "5.0.0"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/default-test-project'
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status=$STATUS"
+      - name: Assert scan-time is a positive number
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: scan-time is not a non-negative integer, got '$SCAN_TIME'"
+            exit 1
+          fi
+          echo "PASS: scan-time=$SCAN_TIME ms"

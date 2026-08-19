@@ -1,0 +1,69 @@
+name: Test working-directory input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a subdirectory with a clean package.json
+        run: |
+          mkdir -p /tmp/test-subdir
+          cat > /tmp/test-subdir/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21"
+            }
+          }
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/test-subdir'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count is numeric
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count '$COUNT' is not a non-negative integer"
+            exit 1
+          fi
+          echo "PASS: affected-count is numeric: $COUNT"
+
+      - name: Assert scan-time is set and numeric
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          if ! echo "$SCAN_TIME" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: scan-time '$SCAN_TIME' is not a non-negative integer"
+            exit 1
+          fi
+          echo "PASS: scan-time is numeric: $SCAN_TIME"

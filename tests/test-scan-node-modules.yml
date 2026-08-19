@@ -1,0 +1,78 @@
+name: Test scan-node-modules option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a test directory with node_modules
+        run: |
+          mkdir -p /tmp/test-node-modules/node_modules/lodash
+          cat > /tmp/test-node-modules/package.json << 'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "^4.17.21"
+            }
+          }
+          EOF
+          cat > /tmp/test-node-modules/node_modules/lodash/package.json << 'EOF'
+          {
+            "name": "lodash",
+            "version": "4.17.21",
+            "description": "Lodash modular utilities."
+          }
+          EOF
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'true'
+          output-format: 'text'
+          working-directory: '/tmp/test-node-modules'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count is numeric
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: affected-count '$COUNT' is not a non-negative integer"
+            exit 1
+          fi
+          echo "PASS: affected-count is numeric: $COUNT"
+
+      - name: Assert lodash is not flagged (it is a legitimate package)
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $COUNT"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' for lodash but got '$STATUS'"
+            exit 1
+          fi
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected affected-count '0' for lodash but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: lodash is not flagged as compromised"

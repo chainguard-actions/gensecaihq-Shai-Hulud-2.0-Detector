@@ -1,0 +1,63 @@
+name: Test SARIF output format
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'sarif'
+          working-directory: '.'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert sarif-file output is set
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "sarif-file: $SARIF_FILE"
+          if [ -z "$SARIF_FILE" ]; then
+            echo "FAIL: sarif-file output is empty"
+            exit 1
+          fi
+          echo "PASS: sarif-file is '$SARIF_FILE'"
+
+      - name: Assert SARIF file exists and is valid JSON
+        env:
+          SARIF_FILE: ${{ steps.action.outputs.sarif-file }}
+        run: |
+          echo "Checking SARIF file: $SARIF_FILE"
+          if [ ! -f "$SARIF_FILE" ]; then
+            echo "FAIL: SARIF file does not exist at '$SARIF_FILE'"
+            exit 1
+          fi
+          # Validate it's valid JSON with SARIF structure
+          python3 -c "
+          import sys, json
+          with open('$SARIF_FILE') as f:
+              data = json.load(f)
+          assert 'runs' in data or '\$schema' in data or 'version' in data, 'Expected SARIF structure'
+          print('SARIF structure looks valid')
+          " || {
+            echo "FAIL: SARIF file is not valid JSON or missing expected structure"
+            exit 1
+          }
+          echo "PASS: SARIF file exists and is valid"

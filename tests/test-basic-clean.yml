@@ -1,0 +1,80 @@
+name: Test basic clean scan
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '.'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count output is set
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          echo "PASS: affected-count is '$COUNT'"
+
+      - name: Assert security-findings-count output is set
+        env:
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: security-findings-count output is empty"
+            exit 1
+          fi
+          echo "PASS: security-findings-count is '$FINDINGS'"
+
+      - name: Assert scan-time output is set
+        env:
+          SCAN_TIME: ${{ steps.action.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          echo "PASS: scan-time is '$SCAN_TIME'"
+
+      - name: Assert status is clean (no compromised packages in this repo)
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $COUNT"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' but got '$STATUS'"
+            exit 1
+          fi
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected affected-count '0' but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: scan is clean"

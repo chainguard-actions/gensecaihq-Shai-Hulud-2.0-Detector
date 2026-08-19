@@ -1,0 +1,51 @@
+name: Test scan with clean package.json
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a clean package.json in a temp directory
+        run: |
+          mkdir -p /tmp/clean-project
+          cat > /tmp/clean-project/package.json <<'EOF'
+          {
+            "name": "clean-test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "lodash": "4.17.21",
+              "express": "4.18.2"
+            }
+          }
+          EOF
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/clean-project'
+      - name: Assert status is clean
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected 'clean' but got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS"
+      - name: Assert affected-count is 0
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected '0' but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS"
