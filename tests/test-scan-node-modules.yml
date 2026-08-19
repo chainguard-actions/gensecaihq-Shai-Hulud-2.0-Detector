@@ -1,0 +1,78 @@
+name: Test scan-node-modules option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test project with node_modules
+        run: |
+          mkdir -p /tmp/node-modules-test/node_modules/safe-package
+          # Create a minimal package.json
+          cat > /tmp/node-modules-test/package.json <<'EOF'
+          {
+            "name": "test-project",
+            "version": "1.0.0",
+            "dependencies": {
+              "safe-package": "1.0.0"
+            }
+          }
+          EOF
+          # Create a minimal package in node_modules
+          cat > /tmp/node-modules-test/node_modules/safe-package/package.json <<'EOF'
+          {
+            "name": "safe-package",
+            "version": "1.0.0"
+          }
+          EOF
+
+      - id: scan
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'true'
+          output-format: 'json'
+          working-directory: '/tmp/node-modules-test'
+
+      - name: Assert scan completed with node_modules scanning enabled
+        env:
+          STATUS: ${{ steps.scan.outputs.status }}
+          COUNT: ${{ steps.scan.outputs.affected-count }}
+          SCAN_TIME: ${{ steps.scan.outputs.scan-time }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $COUNT"
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          echo "PASS: node_modules scan completed, status=$STATUS, affected-count=$COUNT"
+
+      - name: Assert results is valid JSON
+        env:
+          RESULTS: ${{ steps.scan.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          echo "$RESULTS" | python3 -c "import sys, json; json.load(sys.stdin)" || {
+            echo "FAIL: results is not valid JSON"
+            exit 1
+          }
+          echo "PASS: results is valid JSON"

@@ -1,0 +1,77 @@
+name: Test basic scan with default settings
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: scan
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '.'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.scan.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          if [ "$STATUS" != "clean" ] && [ "$STATUS" != "affected" ]; then
+            echo "FAIL: status must be 'clean' or 'affected', got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: status=$STATUS"
+
+      - name: Assert affected-count output is set
+        env:
+          COUNT: ${{ steps.scan.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          echo "PASS: affected-count=$COUNT"
+
+      - name: Assert security-findings-count output is set
+        env:
+          FINDINGS: ${{ steps.scan.outputs.security-findings-count }}
+        run: |
+          echo "security-findings-count: $FINDINGS"
+          if [ -z "$FINDINGS" ]; then
+            echo "FAIL: security-findings-count output is empty"
+            exit 1
+          fi
+          echo "PASS: security-findings-count=$FINDINGS"
+
+      - name: Assert scan-time output is set
+        env:
+          SCAN_TIME: ${{ steps.scan.outputs.scan-time }}
+        run: |
+          echo "scan-time: $SCAN_TIME"
+          if [ -z "$SCAN_TIME" ]; then
+            echo "FAIL: scan-time output is empty"
+            exit 1
+          fi
+          echo "PASS: scan-time=$SCAN_TIME"
+
+      - name: Assert results output is set
+        env:
+          RESULTS: ${{ steps.scan.outputs.results }}
+        run: |
+          echo "results: $RESULTS"
+          if [ -z "$RESULTS" ]; then
+            echo "FAIL: results output is empty"
+            exit 1
+          fi
+          echo "PASS: results=$RESULTS"

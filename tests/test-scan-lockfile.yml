@@ -1,0 +1,54 @@
+name: Test lockfile scanning
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'true'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '${{ github.workspace }}/tests/fixtures/lockfile'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert affected-count output is set
+        env:
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "affected-count: $COUNT"
+          if [ -z "$COUNT" ]; then
+            echo "FAIL: affected-count output is empty"
+            exit 1
+          fi
+          echo "PASS: affected-count is '$COUNT'"
+
+      - name: Assert scan completed with clean result for lodash
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          COUNT: ${{ steps.action.outputs.affected-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $COUNT"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' for lodash package but got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS: lockfile scan completed cleanly"

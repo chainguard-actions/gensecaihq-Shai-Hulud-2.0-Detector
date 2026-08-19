@@ -1,0 +1,59 @@
+name: Test warn-on-allowlist option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '${{ github.workspace }}/tests/fixtures/clean'
+          ignore-allowlist: 'false'
+          warn-on-allowlist: 'true'
+
+      - name: Assert status output is set
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: status is '$STATUS'"
+
+      - name: Assert allowlisted-count output is set
+        env:
+          ALLOWLISTED: ${{ steps.action.outputs.allowlisted-count }}
+        run: |
+          echo "allowlisted-count: $ALLOWLISTED"
+          if [ -z "$ALLOWLISTED" ]; then
+            echo "FAIL: allowlisted-count output is empty"
+            exit 1
+          fi
+          echo "PASS: allowlisted-count is '$ALLOWLISTED'"
+
+      - name: Assert scan completed successfully
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+          COUNT: ${{ steps.action.outputs.affected-count }}
+          FINDINGS: ${{ steps.action.outputs.security-findings-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "affected-count: $COUNT"
+          echo "security-findings-count: $FINDINGS"
+          # All outputs should be set
+          if [ -z "$STATUS" ] || [ -z "$COUNT" ] || [ -z "$FINDINGS" ]; then
+            echo "FAIL: one or more required outputs are empty"
+            exit 1
+          fi
+          echo "PASS: all outputs are set"

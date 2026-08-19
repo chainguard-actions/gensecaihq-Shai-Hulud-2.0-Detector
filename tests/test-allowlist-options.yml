@@ -1,0 +1,85 @@
+name: Test allowlist options
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create test directory with allowlist file
+        run: |
+          mkdir -p /tmp/allowlist-test
+          echo '{}' > /tmp/allowlist-test/package.json
+          # Create a valid empty allowlist file (must be a JSON array)
+          echo '[]' > /tmp/allowlist-test/.shai-hulud-allowlist.json
+
+      - id: scan-with-allowlist
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          output-format: 'json'
+          working-directory: '/tmp/allowlist-test'
+          allowlist-path: '.shai-hulud-allowlist.json'
+          ignore-allowlist: 'false'
+          warn-on-allowlist: 'false'
+
+      - name: Assert scan with allowlist completed
+        env:
+          STATUS: ${{ steps.scan-with-allowlist.outputs.status }}
+          ALLOWLISTED: ${{ steps.scan-with-allowlist.outputs.allowlisted-count }}
+        run: |
+          echo "status: $STATUS"
+          echo "allowlisted-count: $ALLOWLISTED"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty"
+            exit 1
+          fi
+          echo "PASS: scan with allowlist completed, status=$STATUS"
+
+      - id: scan-ignore-allowlist
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          output-format: 'json'
+          working-directory: '/tmp/allowlist-test'
+          ignore-allowlist: 'true'
+          warn-on-allowlist: 'false'
+
+      - name: Assert scan with ignore-allowlist completed
+        env:
+          STATUS: ${{ steps.scan-ignore-allowlist.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty when ignore-allowlist=true"
+            exit 1
+          fi
+          echo "PASS: scan with ignore-allowlist=true completed, status=$STATUS"
+
+      - id: scan-warn-on-allowlist
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          output-format: 'text'
+          working-directory: '/tmp/allowlist-test'
+          allowlist-path: '.shai-hulud-allowlist.json'
+          ignore-allowlist: 'false'
+          warn-on-allowlist: 'true'
+
+      - name: Assert scan with warn-on-allowlist completed
+        env:
+          STATUS: ${{ steps.scan-warn-on-allowlist.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ -z "$STATUS" ]; then
+            echo "FAIL: status output is empty when warn-on-allowlist=true"
+            exit 1
+          fi
+          echo "PASS: scan with warn-on-allowlist=true completed, status=$STATUS"

@@ -1,0 +1,55 @@
+name: Test allowlist functionality
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        with:
+          fail-on-critical: 'false'
+          fail-on-high: 'false'
+          fail-on-any: 'false'
+          scan-lockfiles: 'false'
+          scan-node-modules: 'false'
+          output-format: 'text'
+          working-directory: '${{ github.workspace }}/tests/fixtures/clean'
+          allowlist-path: '${{ github.workspace }}/tests/fixtures/allowlist/.shai-hulud-allowlist.json'
+          ignore-allowlist: 'false'
+          warn-on-allowlist: 'false'
+
+      - name: Assert allowlisted-count output is set
+        env:
+          ALLOWLISTED: ${{ steps.action.outputs.allowlisted-count }}
+        run: |
+          echo "allowlisted-count: $ALLOWLISTED"
+          if [ -z "$ALLOWLISTED" ]; then
+            echo "FAIL: allowlisted-count output is empty"
+            exit 1
+          fi
+          echo "PASS: allowlisted-count is '$ALLOWLISTED'"
+
+      - name: Assert status is clean
+        env:
+          STATUS: ${{ steps.action.outputs.status }}
+        run: |
+          echo "status: $STATUS"
+          if [ "$STATUS" != "clean" ]; then
+            echo "FAIL: expected status 'clean' but got '$STATUS'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert allowlisted-count is 0 for empty allowlist
+        env:
+          ALLOWLISTED: ${{ steps.action.outputs.allowlisted-count }}
+        run: |
+          echo "allowlisted-count: $ALLOWLISTED"
+          if [ "$ALLOWLISTED" != "0" ]; then
+            echo "FAIL: expected allowlisted-count '0' but got '$ALLOWLISTED'"
+            exit 1
+          fi
+          echo "PASS: allowlisted-count is 0 as expected"

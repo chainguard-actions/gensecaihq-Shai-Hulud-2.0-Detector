@@ -1,0 +1,8 @@
+{
+  "name": "test-lockfile-project",
+  "version": "1.0.0",
+  "description": "A clean test project for lockfile scanning",
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
+}
